@@ -1,0 +1,1566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Chess - Pixel Edition</title>
+    <!-- Load Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Load Chess.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <!-- Fonts: Inter for logic, VT323 for Pixel UI -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=VT323&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background: #0a0b10; 
+            font-family: "Inter", sans-serif; 
+            color: #333;
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        /* --- PIXEL ART MENU UI --- */
+        #ui-container {
+            position: absolute;
+            top: 24px;
+            left: 24px;
+            width: 190px;
+            padding: 16px;
+            background: #fff;
+            border: 2px solid #000;
+            box-shadow: 4px 4px 0px rgba(0,0,0,1);
+            pointer-events: auto;
+            z-index: 10;
+            user-select: none;
+            font-family: 'VT323', monospace; /* Pixel Font */
+        }
+
+        h1 { 
+            font-size: 28px; 
+            font-weight: 400; 
+            margin: 0 0 16px 0; 
+            color: #000;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 2px solid #000;
+            padding-bottom: 4px;
+            text-align: center;
+            line-height: 1;
+        }
+
+        .control-group { margin-bottom: 16px; }
+
+        label { 
+            font-size: 18px; 
+            font-weight: 400;
+            color: #444; 
+            display: block;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+
+        select {
+            appearance: none;
+            width: 100%;
+            padding: 6px 10px;
+            background: #fff;
+            color: #000;
+            border: 2px solid #000;
+            border-radius: 0;
+            outline: none;
+            font-family: 'VT323', monospace;
+            font-size: 20px;
+            cursor: pointer;
+            box-shadow: 2px 2px 0px #000;
+            transition: all 0.1s;
+        }
+        select:active { transform: translate(2px, 2px); box-shadow: 0px 0px 0px #000; }
+        select:focus { background: #eee; }
+
+        .btn-group { display: flex; gap: 8px; margin-bottom: 8px; }
+
+        button {
+            flex: 1;
+            padding: 8px 0;
+            border: 2px solid #000;
+            border-radius: 0;
+            font-size: 20px;
+            font-weight: 400;
+            cursor: pointer;
+            transition: all 0.1s;
+            font-family: 'VT323', monospace;
+            box-shadow: 2px 2px 0px #000;
+            text-transform: uppercase;
+        }
+
+        .btn-primary { background: #000; color: #fff; }
+        .btn-primary:hover { background: #333; }
+        .btn-primary:active { transform: translate(2px, 2px); box-shadow: 0px 0px 0px #000; }
+
+        .btn-secondary { background: #fff; color: #000; }
+        .btn-secondary:hover { background: #eee; }
+        .btn-secondary:active { transform: translate(2px, 2px); box-shadow: 0px 0px 0px #000; }
+        
+        .btn-undo { background: #ff4757; color: #fff; }
+        .btn-undo:hover { background: #ff6b81; }
+        .btn-undo:active { transform: translate(2px, 2px); box-shadow: 0px 0px 0px #000; }
+
+        #status { 
+            margin-top: 16px; 
+            padding: 8px;
+            background: #000; 
+            color: #fff;
+            border-radius: 0;
+            font-size: 20px;
+            text-align: center;
+            box-shadow: 2px 2px 0px #444;
+        }
+        
+        .instructions {
+            margin-top: 12px;
+            font-size: 16px;
+            color: #666;
+            text-align: center;
+            font-family: 'VT323', monospace;
+        }
+
+        #loading {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: #fff;
+            padding: 16px 32px;
+            border: 2px solid #000;
+            box-shadow: 4px 4px 0px #000;
+            color: #000;
+            font-size: 24px;
+            font-family: 'VT323', monospace;
+            display: none;
+            z-index: 20;
+            pointer-events: none;
+        }
+
+        /* --- PIXEL ART SPEECH BUBBLE (UNCHANGED) --- */
+        #speech-bubble {
+            position: absolute;
+            top: 0; left: 0;
+            width: 160px;
+            min-height: 30px;
+            background: #fff;
+            padding: 8px 10px;
+            border: 2px solid #000;
+            box-shadow: 3px 3px 0px rgba(0,0,0,0.8);
+            border-radius: 0;
+            font-family: 'VT323', monospace;
+            font-size: 18px;
+            line-height: 1.1;
+            color: #000;
+            pointer-events: none;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity 0.2s, transform 0.2s;
+            z-index: 15;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            overflow: visible;
+        }
+        #speech-bubble.visible { opacity: 1; transform: translateY(0); }
+        #speech-bubble::after {
+            content: ''; position: absolute; left: -8px; bottom: 8px; width: 0; height: 0;
+            border-top: 8px solid transparent; border-bottom: 8px solid transparent; border-right: 8px solid #000;
+        }
+        #speech-bubble::before {
+            content: ''; position: absolute; left: -4px; bottom: 8px; width: 0; height: 0;
+            border-top: 8px solid transparent; border-bottom: 8px solid transparent; border-right: 8px solid #fff; z-index: 1;
+        }
+    </style>
+</head>
+<body>
+
+<div id="ui-container">
+    <h1>Zen Chess</h1>
+    
+    <div class="control-group">
+        <label>Opponent</label>
+        <select id="level" onchange="updateAvatar(this.value)">
+            <option value="1">Slimey (Lvl 1)</option>
+            <option value="2">Agent (Lvl 2)</option>
+            <option value="3" selected>Overlord (Lvl 3)</option>
+        </select>
+    </div>
+
+    <div class="control-group">
+        <label>Mode</label>
+        <div class="btn-group">
+            <button class="btn-primary" onclick="startH2M()">Play</button>
+            <button class="btn-secondary" onclick="startM2M()">Watch</button>
+        </div>
+        <div class="btn-group">
+            <button class="btn-undo" onclick="undoMove()">Undo</button>
+        </div>
+    </div>
+    
+    <div id="status">Ready</div>
+    
+    <div class="instructions">
+        Right Click to Orbit
+    </div>
+</div>
+
+<div id="loading">Thinking...</div>
+<div id="speech-bubble">Hello!</div>
+
+<script>
+    // ==========================================
+    // PART 0: LLM CONFIGURATION (SiliconFlow)
+    // ==========================================
+    const API_KEY = "sk-nndzboflanlhwdgdomhakclakkniheaekkxndwfgupbwzrqu"; 
+    const API_URL = "https://api.siliconflow.cn/v1/chat/completions";
+    // Using the specific model user requested
+    const MODEL_NAME = "Qwen/Qwen3-Omni-30B-A3B-Instruct"; 
+
+    // Personas - Updated for EXTREME BREVITY
+    const PERSONAS = {
+        1: {
+            name: "Slimey",
+            prompt: "You are Slimey, a cute green slime. Comment on the last chess exchange (player's move vs your move). Keep it cute, simple, and emotive. Max 20 words. English only."
+        },
+        2: {
+            name: "Agent",
+            prompt: "You are a tactical Secret Agent. Analyze the last exchange (enemy move vs your counter). Cold, precise, military style. Max 20 words. English only."
+        },
+        3: {
+            name: "Overlord",
+            prompt: "You are an Evil Overlord. Mock the player's move and praise your own counter-attack. Arrogant, loud. Max 20 words. English only."
+        }
+    };
+
+    // --- FALLBACK RESPONSES (Local) ---
+    function getFallbackResponse(level, game) {
+        const inCheck = game.in_check();
+        const inMate = game.in_checkmate();
+        
+        if (level === 1) {
+            if (inMate) return "Oh my... did the game end? Good game!";
+            if (inCheck) return "Eek! Check! Watch out!";
+            return "Boing! Moving pieces is fun. Your turn!";
+        } else if (level === 2) {
+            if (inMate) return "Checkmate. The outcome was calculated.";
+            if (inCheck) return "King is under threat. Respond immediately.";
+            return "Position adjusted. Maintaining tactical advantage.";
+        } else {
+            if (inMate) return "DEFEAT WAS INEVITABLE! KNEEL!";
+            if (inCheck) return "A MINOR ANNOYANCE. YOU CANNOT WIN!";
+            return "Your resistance is futile. I see all outcomes.";
+        }
+    }
+
+    async function callSiliconFlowAPI(systemPrompt, userContent, currentLevel) {
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${API_KEY}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: MODEL_NAME,
+                    messages: [
+                        { role: "system", content: systemPrompt },
+                        { role: "user", content: userContent }
+                    ],
+                    max_tokens: 60, 
+                    temperature: 0.7
+                })
+            });
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                console.warn(`SiliconFlow API Error (${response.status}):`, errData);
+                throw new Error(`API Status ${response.status}`);
+            }
+
+            const data = await response.json();
+            let text = data.choices[0].message.content.trim();
+            text = text.replace(/^["']|["']$/g, '').replace(/\s+/g, ' '); 
+            return text;
+        } catch (error) {
+            console.error('Using Fallback due to LLM Error:', error.message);
+            return getFallbackResponse(currentLevel, game);
+        }
+    }
+
+    // ==========================================
+    // PART 1: CHESS ENGINE
+    // ==========================================
+    
+    const PIECE_VALUES = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000 };
+    const PAWN_TABLE = [0,0,0,0,0,0,0,0, 5,10,10,-20,-20,10,10,5, 5,-5,-10,0,0,-10,-5,5, 0,0,0,20,20,0,0,0, 5,5,10,25,25,10,5,5, 10,10,20,30,30,20,10,10, 50,50,50,50,50,50,50,50, 0,0,0,0,0,0,0,0];
+    const KNIGHT_TABLE = [-50,-40,-30,-30,-30,-30,-40,-50, -40,-20,0,5,5,0,-20,-40, -30,5,10,15,15,10,5,-30, -30,0,15,20,20,15,0,-30, -30,5,15,20,20,15,5,-30, -30,0,10,15,15,10,0,-30, -40,-20,0,0,0,0,-20,-40, -50,-40,-30,-30,-30,-30,-40,-50];
+    const KING_TABLE_MID = [-30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30, -20,-30,-30,-40,-40,-30,-30,-20, -10,-20,-20,-20,-20,-20,-20,-10, 20,20,0,0,0,0,20,20, 20,30,10,0,0,10,30,20];
+
+    function squareMirror(sqIndex) { return sqIndex ^ 56; }
+    function getPstScore(piece, r, c) {
+        const sqIndex = (7 - r) * 8 + c;
+        let table = null;
+        if (piece.type === 'p') table = PAWN_TABLE;
+        else if (piece.type === 'n') table = KNIGHT_TABLE;
+        else if (piece.type === 'k') table = KING_TABLE_MID;
+        if (!table) return 0;
+        return piece.color === 'w' ? table[sqIndex] : table[squareMirror(sqIndex)];
+    }
+    function materialEval(game) {
+        let total = 0;
+        const board = game.board();
+        for(let r=0; r<8; r++) { for(let c=0; c<8; c++) {
+            const piece = board[r][c];
+            if(piece) {
+                const val = PIECE_VALUES[piece.type];
+                if(piece.color === 'w') total += val; else total -= val;
+            }
+        }}
+        return total;
+    }
+
+    function evaluateLevel1(game) { return materialEval(game); }
+    function getMoveLevel1(game) {
+        const moves = game.moves({ verbose: true });
+        if (moves.length === 0) return null;
+        let scoredMoves = [];
+        for (const m of moves) {
+            game.move(m); scoredMoves.push({ score: evaluateLevel1(game), move: m }); game.undo();
+        }
+        const isWhite = game.turn() === 'w';
+        scoredMoves.sort((a, b) => isWhite ? b.score - a.score : a.score - b.score);
+        return scoredMoves.slice(0, 3)[Math.floor(Math.random() * Math.min(3, scoredMoves.length))].move;
+    }
+
+    function evaluateLevel2(game) {
+        if (game.in_checkmate()) return game.turn() === 'w' ? -99999 : 99999;
+        let score = 0;
+        const board = game.board();
+        for(let r=0; r<8; r++) { for(let c=0; c<8; c++) {
+            const piece = board[r][c];
+            if(piece) {
+                const val = PIECE_VALUES[piece.type];
+                const pst = getPstScore(piece, r, c);
+                if(piece.color === 'w') score += (val + pst); else score -= (val + pst);
+            }
+        }}
+        return score;
+    }
+
+    function negamaxLevel2(game, depth, alpha, beta, colorMultiplier) {
+        if (depth === 0 || game.game_over()) return colorMultiplier * evaluateLevel2(game);
+        let maxEval = -Infinity;
+        const moves = game.moves({ verbose: true });
+        moves.sort((a, b) => (b.flags.includes('c') ? 1 : 0) - (a.flags.includes('c') ? 1 : 0));
+        for (const move of moves) {
+            game.move(move);
+            const eval = -negamaxLevel2(game, depth - 1, -beta, -alpha, -colorMultiplier);
+            game.undo();
+            maxEval = Math.max(maxEval, eval);
+            alpha = Math.max(alpha, eval);
+            if (alpha >= beta) break;
+        }
+        return maxEval;
+    }
+    function getMoveLevel2(game) {
+        const depth = 3;
+        let bestMove = null; let maxEval = -Infinity; let alpha = -Infinity; let beta = Infinity;
+        const colorMultiplier = game.turn() === 'w' ? 1 : -1;
+        const moves = game.moves({ verbose: true });
+        moves.sort((a, b) => (b.flags.includes('c') ? 1 : 0) - (a.flags.includes('c') ? 1 : 0));
+        for (const move of moves) {
+            game.move(move);
+            const eval = -negamaxLevel2(game, depth - 1, -beta, -alpha, -colorMultiplier);
+            game.undo();
+            if (eval > maxEval) { maxEval = eval; bestMove = move; }
+            alpha = Math.max(alpha, eval);
+        }
+        return bestMove || moves[Math.floor(Math.random() * moves.length)];
+    }
+
+    // ==========================================
+    // PART 1.5: LEVEL 3 - Alpha-Beta Minimax + Quiescence Search + Transposition Table + Opening Book
+    // ==========================================
+
+    const transpositionTable = new Map(); // Key: fen, Value: {depth, score, flag}
+
+    // --- OPENING BOOK (Full ECO from GitHub) ---
+    // Mapping: Key = FEN(simplified), Value = List of Moves (SAN strings)
+    const OPENING_BOOK_MOVES = new Map();
+    let isBookLoaded = false;
+
+    async function loadOpeningBook() {
+        const files = ['ecoA', 'ecoB', 'ecoC', 'ecoD', 'ecoE'];
+        const baseUrl = 'https://raw.githubusercontent.com/hayatbiralem/eco.json/master/';
+        
+        console.log("Loading Opening Book... This may take a while.");
+        let countVariations = 0;
+        
+        // Virtual game for replay
+        const tempGame = new Chess();
+        
+        try {
+            const promises = files.map(f => fetch(baseUrl + f + '.json').then(res => res.json()));
+            const results = await Promise.all(promises);
+            
+            results.forEach(data => {
+                // data is object: { FEN: { moves: "..." } }
+                Object.values(data).forEach(entry => {
+                    const movesStr = entry.moves;
+                    if (!movesStr) return;
+                    
+                    tempGame.reset();
+                    
+                    // Parse moves: remove "1." etc
+                    const sanTokens = movesStr.split(/\s+/).filter(t => !/^\d+\.$/.test(t));
+                    
+                    for (const san of sanTokens) {
+                        // 1. Get Key
+                        const fen = tempGame.fen();
+                        const key = fen.split(' ').slice(0, 4).join(' ');
+                        
+                        // 2. Move
+                        const move = tempGame.move(san);
+                        if (!move) break; // Stop if invalid
+                        
+                        // 3. Store
+                        if (!OPENING_BOOK_MOVES.has(key)) {
+                            OPENING_BOOK_MOVES.set(key, []);
+                        }
+                        const list = OPENING_BOOK_MOVES.get(key);
+                        if (!list.includes(san)) {
+                            list.push(san);
+                        }
+                    }
+                    countVariations++;
+                });
+            });
+            
+            isBookLoaded = true;
+            console.log(`Opening Book Loaded: ${countVariations} variations covering ${OPENING_BOOK_MOVES.size} unique positions.`);
+        } catch (e) {
+            console.error("Failed to load Opening Book:", e);
+        }
+    }
+
+    function getBookMove(game) {
+        if (!isBookLoaded) return null;
+        
+        const fen = game.fen();
+        const key = fen.split(' ').slice(0, 4).join(' ');
+        
+        if (OPENING_BOOK_MOVES.has(key)) {
+            const candidates = OPENING_BOOK_MOVES.get(key);
+            if (candidates && candidates.length > 0) {
+                const san = candidates[Math.floor(Math.random() * candidates.length)];
+                console.log("Found Book Move:", san);
+                // Convert SAN to move object that the game engine expects
+                const moveObj = game.move(san);
+                game.undo(); // Undo because we just wanted to convert/validate
+                return moveObj;
+            }
+        }
+        return null;
+    }
+
+    function evaluateLevel3(game) {
+        return evaluateLevel2(game);
+    }
+
+    function getMoveLevel3(game) {
+        // 1. Check Opening Book
+        const bookMove = getBookMove(game);
+        if (bookMove) {
+            return bookMove;
+        }
+
+        // Optional: Clear TT to avoid memory leak in long run, or keep it for better performance
+        if (transpositionTable.size > 50000) transpositionTable.clear();
+
+        let bestMove = null;
+        const colorMultiplier = game.turn() === 'w' ? 1 : -1;
+        
+        // Move Ordering: Captures first
+        let moves = game.moves({ verbose: true });
+        moves.sort((a, b) => {
+             const scoreA = (a.flags.includes('c') || a.flags.includes('e')) ? 10 : 0;
+             const scoreB = (b.flags.includes('c') || b.flags.includes('e')) ? 10 : 0;
+             return scoreB - scoreA;
+        });
+
+        const startTime = Date.now();
+        const timeLimit = 2500; // 2.5s
+        const maxDepth = 12;
+
+        for (let depth = 1; depth <= maxDepth; depth++) {
+            if (Date.now() - startTime > timeLimit) break;
+
+            let currentBestMove = null;
+            let currentMaxEval = -Infinity;
+            let alpha = -Infinity;
+            let beta = Infinity;
+            let completed = true;
+
+            for (const move of moves) {
+                if (Date.now() - startTime > timeLimit) {
+                    completed = false;
+                    break;
+                }
+
+                game.move(move);
+                const val = negamaxLevel3(game, depth - 1, -beta, -alpha, -colorMultiplier, startTime, timeLimit);
+                game.undo();
+                
+                if (val === null) {
+                    completed = false;
+                    break;
+                }
+
+                const score = -val;
+                if (score > currentMaxEval) {
+                    currentMaxEval = score;
+                    currentBestMove = move;
+                }
+                alpha = Math.max(alpha, score);
+            }
+
+            if (completed) {
+                bestMove = currentBestMove;
+                console.log(`Level 3 Depth ${depth} Eval: ${currentMaxEval} | TT Size: ${transpositionTable.size}`);
+            } else {
+                console.log(`Level 3 Depth ${depth} Interrupted (Timeout)`);
+                break;
+            }
+        }
+        
+        return bestMove || moves[0];
+    }
+
+    function quiescenceSearch(game, alpha, beta, colorMultiplier) {
+        // Stand pat
+        const standPat = colorMultiplier * evaluateLevel3(game);
+        if (standPat >= beta) return beta;
+        if (alpha < standPat) alpha = standPat;
+        
+        // Generate captures only
+        let moves = game.moves({ verbose: true }).filter(m => m.flags.includes('c') || m.flags.includes('e'));
+        
+        // MVV-LVA Ordering (Simplified)
+        moves.sort((a, b) => {
+            const valA = PIECE_VALUES[a.captured] || 0;
+            const valB = PIECE_VALUES[b.captured] || 0;
+            return valB - valA;
+        });
+
+        for (const move of moves) {
+            game.move(move);
+            const score = -quiescenceSearch(game, -beta, -alpha, -colorMultiplier);
+            game.undo();
+            
+            if (score >= beta) return beta;
+            if (score > alpha) alpha = score;
+        }
+        return alpha;
+    }
+
+    function negamaxLevel3(game, depth, alpha, beta, colorMultiplier, startTime, timeLimit) {
+        if ((Date.now() - startTime) > timeLimit) return null; // Timeout
+
+        const fen = game.fen();
+        
+        // TT Lookup
+        if (transpositionTable.has(fen)) {
+            const entry = transpositionTable.get(fen);
+            if (entry.depth >= depth) {
+                if (entry.flag === 0) return entry.score; // Exact
+                if (entry.flag === 1) alpha = Math.max(alpha, entry.score); // Lowerbound
+                else if (entry.flag === 2) beta = Math.min(beta, entry.score); // Upperbound
+                
+                if (alpha >= beta) return entry.score;
+            }
+        }
+
+        if (depth === 0 || game.game_over()) {
+            if (game.game_over()) return colorMultiplier * evaluateLevel3(game);
+            // Enter Quiescence Search
+            return quiescenceSearch(game, alpha, beta, colorMultiplier);
+        }
+
+        let moves = game.moves({ verbose: true });
+        // Move Ordering
+        moves.sort((a, b) => {
+             const scoreA = (a.flags.includes('c') || a.flags.includes('e')) ? 10 : 0;
+             const scoreB = (b.flags.includes('c') || b.flags.includes('e')) ? 10 : 0;
+             return scoreB - scoreA;
+        });
+
+        let maxEval = -Infinity;
+        const alphaOrig = alpha;
+
+        for (const move of moves) {
+            game.move(move);
+            const val = negamaxLevel3(game, depth - 1, -beta, -alpha, -colorMultiplier, startTime, timeLimit);
+            game.undo();
+            
+            if (val === null) return null; // Propagate timeout
+
+            const eval = -val;
+            maxEval = Math.max(maxEval, eval);
+            alpha = Math.max(alpha, eval);
+            if (alpha >= beta) break;
+        }
+        
+        // TT Store
+        let ttFlag = 0;
+        if (maxEval <= alphaOrig) ttFlag = 2; // Upperbound
+        else if (maxEval >= beta) ttFlag = 1; // Lowerbound
+        else ttFlag = 0; // Exact
+        
+        transpositionTable.set(fen, { depth: depth, score: maxEval, flag: ttFlag });
+
+        return maxEval;
+    }
+    function getBestMove(game) {
+        const level = document.getElementById('level').value;
+        if (level == "1") return getMoveLevel1(game);
+        if (level == "2") return getMoveLevel2(game);
+        return getMoveLevel3(game);
+    }
+
+    // ==========================================
+    // PART 2: VISUALIZATION & PIXEL AVATARS
+    // ==========================================
+
+    let scene, camera, renderer;
+    let boardGroup, piecesGroup, highlightsGroup;
+    let environmentGroup, particleSystem;
+    let coordGroup; // New Coordinates Group 
+    let selectedSquare = null;
+    let game = new Chess();
+    let isM2M = false;
+    let aiTimeout = null;
+    let activeTween = null;
+    let isAnimating = false;
+    let avatarSprite = null;
+
+    const SQUARE_SIZE = 10;
+    const BOARD_OFFSET = -35;
+
+    const MAT_WHITE_PIECE = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2, metalness: 0.1 });
+    const MAT_BLACK_PIECE = new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.2, metalness: 0.5 });
+    const COL_SQ_LIGHT = 0xe0e0e0; 
+    const COL_SQ_DARK = 0x404040;
+    const COL_HIGHLIGHT = 0x4db8ff; 
+
+    // --- PIXEL ART GENERATION ---
+    const ART_L1 = [0,0,0,0,0,0,0,0, 0,0,1,1,1,1,0,0, 0,1,1,1,1,1,1,0, 0,1,2,1,1,2,1,0, 0,1,1,1,1,1,1,0, 0,1,1,2,2,1,1,0, 0,1,1,1,1,1,1,0, 0,0,1,1,1,1,0,0];
+    const PALETTE_L1 = [null, '#4cd137', '#000000', '#f5f6fa']; 
+
+    const ART_L2 = [0,0,1,1,1,1,0,0, 0,1,1,1,1,1,1,0, 0,1,3,3,3,3,1,0, 0,1,3,2,2,3,1,0, 0,1,1,1,1,1,1,0, 0,1,1,2,2,1,1,0, 0,0,1,1,1,1,0,0, 0,0,2,2,2,2,0,0];
+    const PALETTE_L2 = [null, '#ff9f43', '#2f3542', '#222']; 
+
+    const ART_L3 = [0,1,1,1,1,1,1,0, 1,1,2,2,2,2,1,1, 1,2,4,2,2,4,2,1, 1,2,2,2,2,2,2,1, 1,2,2,4,4,2,2,1, 1,2,1,1,1,1,2,1, 1,1,2,2,2,2,1,1, 0,1,1,0,0,1,1,0];
+    const PALETTE_L3 = [null, '#575fcf', '#1e272e', '#fff', '#ff3f34']; 
+
+    function createAvatarTexture(artData, palette) {
+        const size = 8;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        for(let i=0; i<64; i++) {
+            const colorIdx = artData[i];
+            if (colorIdx > 0 && palette[colorIdx]) {
+                const x = i % size;
+                const y = Math.floor(i / size);
+                ctx.fillStyle = palette[colorIdx];
+                ctx.fillRect(x, y, 1, 1);
+            }
+        }
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.magFilter = THREE.NearestFilter;
+        texture.minFilter = THREE.NearestFilter;
+        return texture;
+    }
+
+    // --- COORDINATES SYSTEM ---
+    function createCoordinates() {
+        coordGroup = new THREE.Group();
+        scene.add(coordGroup);
+
+        const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+        const ranks = ['8', '7', '6', '5', '4', '3', '2', '1'];
+
+        // Create File Labels (a-h)
+        files.forEach((char, i) => {
+            const texture = createLabelTexture(char);
+            
+            // Bottom side
+            const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, opacity: 0.9 }));
+            sprite.position.set(i * SQUARE_SIZE + BOARD_OFFSET, 0.5, 42); 
+            sprite.scale.set(6, 6, 1);
+            sprite.userData = { originalY: 0.5, offset: i * 0.2 }; 
+            coordGroup.add(sprite);
+            
+            // Top side
+            const sprite2 = sprite.clone();
+            sprite2.position.set(i * SQUARE_SIZE + BOARD_OFFSET, 0.5, -42); 
+            sprite2.userData = { originalY: 0.5, offset: i * 0.2 + 1 };
+            coordGroup.add(sprite2);
+        });
+
+        // Create Rank Labels (1-8)
+        ranks.forEach((char, i) => {
+            const texture = createLabelTexture(char);
+            
+            // Left side
+            const spriteLeft = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, opacity: 0.9 }));
+            spriteLeft.position.set(-42, 0.5, i * SQUARE_SIZE + BOARD_OFFSET); 
+            spriteLeft.scale.set(6, 6, 1);
+            spriteLeft.userData = { originalY: 0.5, offset: i * 0.2 + 2 };
+            coordGroup.add(spriteLeft);
+
+            // Right side
+            const spriteRight = spriteLeft.clone();
+            spriteRight.position.set(42, 0.5, i * SQUARE_SIZE + BOARD_OFFSET);
+            spriteRight.userData = { originalY: 0.5, offset: i * 0.2 + 3 };
+            coordGroup.add(spriteRight);
+        });
+    }
+
+    function createLabelTexture(text) {
+        const canvas = document.createElement('canvas');
+        const size = 128; 
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        
+        // Glow effect
+        ctx.shadowColor = "rgba(255, 255, 255, 1.0)";
+        ctx.shadowBlur = 15;
+        
+        ctx.font = 'bold 60px "Inter", sans-serif'; 
+        ctx.fillStyle = "white";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        
+        // Draw multiple times to intensify glow
+        ctx.fillText(text, size/2, size/2);
+        ctx.fillText(text, size/2, size/2);
+        
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.minFilter = THREE.LinearFilter;
+        return tex;
+    }
+
+    function init() {
+        scene = new THREE.Scene();
+        const BG_COLOR = 0x0a0b10;
+        scene.background = new THREE.Color(BG_COLOR);
+        scene.fog = new THREE.FogExp2(BG_COLOR, 0.003); 
+
+        // Start loading book
+        loadOpeningBook();
+
+        camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 1000);
+        
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.0;
+        document.body.appendChild(renderer.domElement);
+
+        const ambient = new THREE.AmbientLight(0xffffff, 0.2);
+        scene.add(ambient);
+
+        const spotLight = new THREE.SpotLight(0xffeebb, 1.5);
+        spotLight.position.set(40, 120, 40);
+        spotLight.castShadow = true;
+        spotLight.shadow.mapSize.width = 2048;
+        spotLight.shadow.mapSize.height = 2048;
+        spotLight.angle = Math.PI / 4;
+        spotLight.penumbra = 0.5;
+        scene.add(spotLight);
+
+        const rimLight = new THREE.SpotLight(0x4d88ff, 2.0);
+        rimLight.position.set(-60, 50, -60);
+        rimLight.lookAt(0,0,0);
+        scene.add(rimLight);
+
+        const fillLight = new THREE.PointLight(0xccddff, 0.5);
+        fillLight.position.set(60, 20, -60);
+        scene.add(fillLight);
+
+        createEnvironment();
+        createBoard();
+        createCoordinates(); // Add Coordinates
+        createAvatar(); 
+        
+        piecesGroup = new THREE.Group();
+        scene.add(piecesGroup);
+
+        highlightsGroup = new THREE.Group();
+        scene.add(highlightsGroup);
+
+        updateBoardDisplay();
+        updateCamPos(); 
+
+        window.addEventListener('resize', onWindowResize);
+        window.addEventListener('click', onMouseClick);
+        window.addEventListener('contextmenu', e => e.preventDefault());
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mousedown', e => { 
+            if(e.button===2) { isDragging=true; prevMouse = {x: e.clientX, y: e.clientY}; }
+        });
+        document.addEventListener('mouseup', () => isDragging=false);
+        document.addEventListener('wheel', onWheel, { passive: false });
+
+        animate();
+        // Initial Greeting
+        analyzeAndSpeak(true);
+    }
+
+    // --- AVATAR & SPEECH LOGIC ---
+    function createAvatar() {
+        const mat = new THREE.SpriteMaterial({ 
+            map: createAvatarTexture(ART_L3, PALETTE_L3), 
+            transparent: true 
+        });
+        avatarSprite = new THREE.Sprite(mat);
+        avatarSprite.position.set(0, 22, -55); 
+        avatarSprite.scale.set(20, 20, 1);
+        scene.add(avatarSprite);
+        updateAvatar(3); 
+    }
+
+    window.updateAvatar = function(level) {
+        if (!avatarSprite) return;
+        let art, palette;
+        if (level == 1) { art = ART_L1; palette = PALETTE_L1; }
+        else if (level == 2) { art = ART_L2; palette = PALETTE_L2; }
+        else { art = ART_L3; palette = PALETTE_L3; }
+        
+        avatarSprite.material.map = createAvatarTexture(art, palette);
+        
+        // Greeting on change
+        analyzeAndSpeak(true);
+
+        // Bounce
+        let t = 0;
+        const popAnim = setInterval(() => {
+            t += 0.2;
+            avatarSprite.scale.set(20 + Math.sin(t)*2, 20 + Math.sin(t)*2, 1);
+            if(t > Math.PI) clearInterval(popAnim);
+        }, 16);
+    };
+
+    // --- LLM INTEGRATION ---
+    async function analyzeAndSpeak(isStart = false) {
+        const bubble = document.getElementById('speech-bubble');
+        bubble.innerText = "...";
+        bubble.classList.add('visible');
+
+        const level = parseInt(document.getElementById('level').value);
+        const persona = PERSONAS[level];
+        
+        if (isStart) {
+            const startMsg = await callSiliconFlowAPI(
+                persona.prompt, 
+                "Intro yourself briefly.",
+                level
+            );
+            showSpeech(startMsg);
+            return;
+        }
+
+        // --- NEW LOGIC: Summarize Last 2 Moves ---
+        const history = game.history({ verbose: true });
+        
+        let statusStr = `FEN: ${game.fen()}. `;
+        
+        // Get last 2 moves (Player + AI)
+        if (history.length >= 2) {
+            const playerMove = history[history.length - 2];
+            const aiMove = history[history.length - 1];
+            statusStr += `Player moved ${playerMove.piece} to ${playerMove.to}. `;
+            statusStr += `Then YOU moved ${aiMove.piece} to ${aiMove.to}. `;
+            if (aiMove.flags.includes('c')) statusStr += "You captured a piece! ";
+        } else if (history.length === 1) {
+            const last = history[0];
+            statusStr += `Move: ${last.piece} to ${last.to}. `;
+        }
+        
+        if (game.in_checkmate()) statusStr += "MATE. ";
+        else if (game.in_check()) statusStr += "CHECK. ";
+        
+        // Call LLM
+        const comment = await callSiliconFlowAPI(persona.prompt, statusStr, level);
+        showSpeech(comment);
+    }
+
+    let typeWriterTimeout;
+    function showSpeech(text) {
+        const bubble = document.getElementById('speech-bubble');
+        if (!text) text = "...";
+        
+        // --- TRUNCATION LOGIC ---
+        if (text.length > 120) {
+            text = text.substring(0, 117) + "...";
+        }
+
+        bubble.innerText = "";
+        bubble.classList.add('visible');
+        
+        let i = 0;
+        if (typeWriterTimeout) clearInterval(typeWriterTimeout);
+        
+        typeWriterTimeout = setInterval(() => {
+            bubble.innerText += text.charAt(i);
+            i++;
+            if (i > text.length) {
+                clearInterval(typeWriterTimeout);
+                // NO auto-hide here anymore
+            }
+        }, 40);
+    }
+
+    function updateSpeechBubble() {
+        if (!avatarSprite) return;
+        const vector = avatarSprite.position.clone();
+        vector.x += 25; 
+        vector.y += 10;
+        vector.project(camera);
+
+        const x = (vector.x * .5 + .5) * window.innerWidth;
+        const y = (-(vector.y * .5) + .5) * window.innerHeight;
+
+        const bubble = document.getElementById('speech-bubble');
+        bubble.style.left = `${x}px`;
+        bubble.style.top = `${y}px`;
+    }
+
+    function createEnvironment() {
+        environmentGroup = new THREE.Group();
+        scene.add(environmentGroup);
+
+        const pedGeo = new THREE.CylinderGeometry(65, 55, 10, 64);
+        const pedMat = new THREE.MeshStandardMaterial({ color: 0x151520, roughness: 0.2, metalness: 0.6 });
+        const pedestal = new THREE.Mesh(pedGeo, pedMat);
+        pedestal.position.y = -8; 
+        pedestal.receiveShadow = true;
+        scene.add(pedestal);
+
+        const ringGeo = new THREE.TorusGeometry(80, 0.5, 16, 100);
+        const ringMat = new THREE.MeshBasicMaterial({ color: 0x4db8ff, transparent: true, opacity: 0.3 });
+        
+        const r1 = new THREE.Mesh(ringGeo, ringMat);
+        r1.rotation.x = Math.PI / 2;
+        r1.position.y = -10;
+        environmentGroup.add(r1);
+
+        const r2 = new THREE.Mesh(new THREE.TorusGeometry(100, 0.3, 16, 100), ringMat);
+        r2.rotation.x = Math.PI / 2.1;
+        r2.position.y = -15;
+        environmentGroup.add(r2);
+
+        const particlesGeo = new THREE.BufferGeometry();
+        const count = 800;
+        const posArray = new Float32Array(count * 3);
+        
+        for(let i=0; i<count*3; i++) {
+            const r = 100 + Math.random() * 200;
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(2 * Math.random() - 1);
+            posArray[i] = r * Math.sin(phi) * Math.cos(theta);
+            posArray[i+1] = r * Math.sin(phi) * Math.sin(theta);
+            posArray[i+2] = r * Math.cos(phi);
+        }
+        
+        particlesGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        const particlesMat = new THREE.PointsMaterial({
+            size: 1.0,
+            color: 0x88ccff,
+            transparent: true,
+            opacity: 0.6,
+            blending: THREE.AdditiveBlending
+        });
+        particleSystem = new THREE.Points(particlesGeo, particlesMat);
+        scene.add(particleSystem);
+    }
+
+    function createBoard() {
+        boardGroup = new THREE.Group();
+        
+        const baseGeo = new THREE.BoxGeometry(84, 1.5, 84);
+        const baseMat = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.1, metalness: 0.8 });
+        const base = new THREE.Mesh(baseGeo, baseMat);
+        base.position.y = -1.5;
+        base.receiveShadow = true;
+        boardGroup.add(base);
+
+        const geometry = new THREE.BoxGeometry(SQUARE_SIZE, 0.8, SQUARE_SIZE); 
+
+        for (let x = 0; x < 8; x++) {
+            for (let z = 0; z < 8; z++) {
+                const isDark = (x + z) % 2 === 1;
+                const mat = new THREE.MeshStandardMaterial({
+                    color: isDark ? COL_SQ_DARK : COL_SQ_LIGHT,
+                    roughness: 0.4,
+                    metalness: 0.2
+                });
+                const cube = new THREE.Mesh(geometry, mat);
+                cube.position.set(x * SQUARE_SIZE + BOARD_OFFSET, -0.4, z * SQUARE_SIZE + BOARD_OFFSET);
+                cube.receiveShadow = true;
+                
+                const file = String.fromCharCode(97 + x);
+                const rank = 8 - z;
+                cube.userData = { square: file + rank };
+                boardGroup.add(cube);
+            }
+        }
+        scene.add(boardGroup);
+    }
+
+    // --- Improved Piece Geometries ---
+    
+    // Helper to create lathe geometry with closed ends
+    function createLathePiece(points, material) {
+        // LatheGeometry by default is open at 0 and 2PI, but usually we want it solid.
+        // We will just use the standard LatheGeometry as it works well for these shapes.
+        const geometry = new THREE.LatheGeometry(points, 32);
+        geometry.computeVertexNormals();
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        return mesh;
+    }
+
+    function getPawnGeo(mat) {
+        // Distinct Round Head
+        const p = [
+            new THREE.Vector2(3.5, 0),   // Base
+            new THREE.Vector2(3.5, 1.5), // Base Top
+            new THREE.Vector2(1.5, 3),   // Neck Start
+            new THREE.Vector2(1.0, 5),   // Neck
+            new THREE.Vector2(2.5, 5.2), // Collar
+            new THREE.Vector2(2.0, 7.5), // Head Bottom
+            new THREE.Vector2(0, 8.0)    // Head Top (Round)
+        ];
+        // Add sphere for head to be perfectly round
+        const group = new THREE.Group();
+        const body = createLathePiece(p, mat);
+        group.add(body);
+        
+        const headGeo = new THREE.SphereGeometry(2.2, 32, 32);
+        const head = new THREE.Mesh(headGeo, mat);
+        head.position.y = 7.5;
+        group.add(head);
+        
+        return group;
+    }
+
+    function getRookGeo(mat) {
+        // Castle / Tower look
+        const p = [
+            new THREE.Vector2(3.5, 0),
+            new THREE.Vector2(3.5, 1.5),
+            new THREE.Vector2(2.8, 2.5),
+            new THREE.Vector2(2.5, 6.0),
+            new THREE.Vector2(3.5, 6.5), // Flare out
+            new THREE.Vector2(3.5, 8.5), // Top
+            new THREE.Vector2(2.5, 8.5), // Inner rim
+            new THREE.Vector2(2.5, 7.5),
+            new THREE.Vector2(0, 7.5)
+        ];
+        return createLathePiece(p, mat);
+    }
+
+    function getBishopGeo(mat) {
+        // Mitre hat
+        const p = [
+            new THREE.Vector2(3.5, 0),
+            new THREE.Vector2(3.5, 1.5),
+            new THREE.Vector2(1.5, 3),
+            new THREE.Vector2(1.2, 6),
+            new THREE.Vector2(2.5, 6.5), // Collar
+            new THREE.Vector2(0, 9.5)    // Pointy Top
+        ];
+        const group = new THREE.Group();
+        const body = createLathePiece(p, mat);
+        group.add(body);
+        
+        // Add a small sphere on very top
+        const topGeo = new THREE.SphereGeometry(0.5, 16, 16);
+        const top = new THREE.Mesh(topGeo, mat);
+        top.position.y = 9.5;
+        group.add(top);
+        
+        return group;
+    }
+
+    function getKnightGeo(mat) {
+        // Horse Head - Simplified Blocky/Low Poly style to match
+        const group = new THREE.Group();
+        
+        // Base
+        const p = [
+            new THREE.Vector2(3.5, 0),
+            new THREE.Vector2(3.5, 1.5),
+            new THREE.Vector2(1.8, 3.0),
+            new THREE.Vector2(0, 3.0)
+        ];
+        const base = createLathePiece(p, mat);
+        group.add(base);
+
+        // Body/Neck (Cylinder tilted)
+        const neckGeo = new THREE.CylinderGeometry(1.5, 2.5, 5, 16);
+        const neck = new THREE.Mesh(neckGeo, mat);
+        neck.position.set(0, 5, 0);
+        neck.rotation.x = -0.2;
+        group.add(neck);
+
+        // Head (Box/Snout)
+        const headGeo = new THREE.BoxGeometry(2.5, 3.0, 5.0);
+        const head = new THREE.Mesh(headGeo, mat);
+        head.position.set(0, 7.5, -1.0);
+        head.rotation.x = 0.3;
+        head.castShadow = true;
+        group.add(head);
+        
+        // Ears
+        const earGeo = new THREE.ConeGeometry(0.5, 1.5, 8);
+        const ear1 = new THREE.Mesh(earGeo, mat);
+        ear1.position.set(0.8, 9.2, 0.5);
+        ear1.rotation.x = -0.3;
+        group.add(ear1);
+        
+        const ear2 = ear1.clone();
+        ear2.position.set(-0.8, 9.2, 0.5);
+        group.add(ear2);
+
+        return group;
+    }
+
+    function getQueenGeo(mat) {
+        // Crown with sphere
+        const p = [
+            new THREE.Vector2(4.0, 0),
+            new THREE.Vector2(4.0, 1.5),
+            new THREE.Vector2(2.0, 3.5),
+            new THREE.Vector2(1.5, 8.0),
+            new THREE.Vector2(3.0, 8.5), // Crown rim
+            new THREE.Vector2(3.5, 9.5), // Crown points
+            new THREE.Vector2(0, 9.5)
+        ];
+        const group = new THREE.Group();
+        const body = createLathePiece(p, mat);
+        group.add(body);
+        
+        const sphereGeo = new THREE.SphereGeometry(1.5, 32, 32);
+        const sphere = new THREE.Mesh(sphereGeo, mat);
+        sphere.position.y = 9.5;
+        group.add(sphere);
+        
+        return group;
+    }
+
+    function getKingGeo(mat) {
+        // Cross on top
+        const p = [
+            new THREE.Vector2(4.0, 0),
+            new THREE.Vector2(4.0, 1.5),
+            new THREE.Vector2(2.0, 3.5),
+            new THREE.Vector2(1.5, 8.0),
+            new THREE.Vector2(3.0, 8.5),
+            new THREE.Vector2(3.0, 9.5),
+            new THREE.Vector2(0, 9.5)
+        ];
+        const group = new THREE.Group();
+        const body = createLathePiece(p, mat);
+        group.add(body);
+        
+        // Cross
+        const vBarGeo = new THREE.BoxGeometry(1.0, 3.0, 1.0);
+        const vBar = new THREE.Mesh(vBarGeo, mat);
+        vBar.position.y = 10.5;
+        group.add(vBar);
+        
+        const hBarGeo = new THREE.BoxGeometry(2.5, 1.0, 1.0);
+        const hBar = new THREE.Mesh(hBarGeo, mat);
+        hBar.position.y = 10.5;
+        group.add(hBar);
+        
+        return group;
+    }
+
+    function createPieceMesh(type, color) {
+        const mat = color === 'w' ? MAT_WHITE_PIECE : MAT_BLACK_PIECE;
+        let mesh;
+        switch(type) {
+            case 'p': mesh = getPawnGeo(mat); break;
+            case 'r': mesh = getRookGeo(mat); break;
+            case 'n': mesh = getKnightGeo(mat); if(color==='b') mesh.rotation.y = Math.PI; break;
+            case 'b': mesh = getBishopGeo(mat); break;
+            case 'q': mesh = getQueenGeo(mat); break;
+            case 'k': mesh = getKingGeo(mat); break;
+        }
+        return mesh;
+    }
+
+    function updateBoardDisplay() {
+        while(piecesGroup.children.length > 0) piecesGroup.remove(piecesGroup.children[0]);
+        const board = game.board();
+        for(let r=0; r<8; r++) { for(let c=0; c<8; c++) {
+            const piece = board[r][c];
+            if(piece) {
+                const mesh = createPieceMesh(piece.type, piece.color);
+                const x = c * SQUARE_SIZE + BOARD_OFFSET;
+                const z = r * SQUARE_SIZE + BOARD_OFFSET;
+                mesh.position.set(x, 0, z);
+                mesh.userData = { type: 'piece', square: String.fromCharCode(97+c) + (8-r) };
+                piecesGroup.add(mesh);
+            }
+        }}
+        updateStatus();
+    }
+
+    function drawHighlights(selected, moves) {
+        while(highlightsGroup.children.length > 0) highlightsGroup.remove(highlightsGroup.children[0]);
+        
+        const createMarker = (sq, color) => {
+            const file = sq.charCodeAt(0) - 97;
+            const rank = 8 - parseInt(sq[1]);
+            const geo = new THREE.RingGeometry(3.5, 4, 32);
+            const mat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.8, side: THREE.DoubleSide });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.rotation.x = -Math.PI / 2;
+            mesh.position.set(file * SQUARE_SIZE + BOARD_OFFSET, 0.1, rank * SQUARE_SIZE + BOARD_OFFSET);
+            highlightsGroup.add(mesh);
+        };
+
+        if(selected) createMarker(selected, 0xffd700); 
+        if(moves && moves.length > 0) moves.forEach(m => createMarker(m.to, COL_HIGHLIGHT)); 
+    }
+
+    function animatePiece(fromSq, toSq, onComplete) {
+        isAnimating = true;
+        const pieceMesh = piecesGroup.children.find(m => m.userData.square === fromSq);
+        if (!pieceMesh) { onComplete(); isAnimating = false; return; }
+
+        const fileIdx = toSq.charCodeAt(0) - 97;
+        const rankIdx = 8 - parseInt(toSq[1]);
+        const targetX = fileIdx * SQUARE_SIZE + BOARD_OFFSET;
+        const targetZ = rankIdx * SQUARE_SIZE + BOARD_OFFSET;
+
+        const captureMesh = piecesGroup.children.find(m => m.userData.square === toSq && m !== pieceMesh);
+        if (captureMesh) captureMesh.visible = false;
+
+        activeTween = {
+            mesh: pieceMesh,
+            start: pieceMesh.position.clone(),
+            end: new THREE.Vector3(targetX, 0, targetZ),
+            startTime: Date.now(),
+            duration: 350,
+            onComplete: () => {
+                isAnimating = false;
+                onComplete();
+            }
+        };
+    }
+
+    // --- Camera Interaction ---
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    let isDragging = false;
+    let prevMouse = {x:0, y:0};
+
+
+    /* ============================
+   TOUCH CONTROLS FOR MOBILE
+============================= */
+
+// Track touches
+let touchMode = false;
+let lastTouchDist = null;
+
+// Single finger drag = orbit camera
+function handleSingleTouch(e) {
+    const touch = e.touches[0];
+    if (!touchMode) {
+        touchMode = true;
+        prevMouse.x = touch.clientX;
+        prevMouse.y = touch.clientY;
+        return;
+    }
+
+    const deltaX = touch.clientX - prevMouse.x;
+    const deltaY = touch.clientY - prevMouse.y;
+
+    camAzimuth -= deltaX * 0.004;
+    camElevation += deltaY * 0.004;
+
+    const minEl = 0.1;
+    const maxEl = Math.PI / 2 - 0.1;
+    camElevation = Math.max(minEl, Math.min(maxEl, camElevation));
+
+    updateCamPos();
+
+    prevMouse.x = touch.clientX;
+    prevMouse.y = touch.clientY;
+}
+
+// Two-finger pinch = zoom
+function handlePinchZoom(e) {
+    const t1 = e.touches[0];
+    const t2 = e.touches[1];
+
+    const dx = t1.clientX - t2.clientX;
+    const dy = t1.clientY - t2.clientY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (!lastTouchDist) {
+        lastTouchDist = dist;
+        return;
+    }
+
+    const delta = dist - lastTouchDist;
+    camRadius -= delta * 0.2;
+
+    camRadius = Math.max(50, Math.min(300, camRadius));
+
+    updateCamPos();
+
+    lastTouchDist = dist;
+}
+
+// Register touch listeners
+document.addEventListener("touchstart", (e) => {
+    if (e.touches.length === 1) {
+        touchMode = false;
+    }
+});
+
+document.addEventListener("touchmove", (e) => {
+    e.preventDefault(); // Stop page scrolling
+
+    if (e.touches.length === 1) {
+        handleSingleTouch(e);
+    } else if (e.touches.length === 2) {
+        handlePinchZoom(e);
+    }
+}, { passive: false });
+
+document.addEventListener("touchend", () => {
+    lastTouchDist = null;
+});
+
+    
+    // Camera Spherical Coordinates
+    let camRadius = 160;     // Distance from center
+    let camAzimuth = 0;      // Horizontal angle (around Y axis)
+    let camElevation = Math.PI / 4; // Vertical angle (from XZ plane), start at 45 deg
+
+    function onMouseMove(e) {
+        if (isDragging) {
+            const deltaX = e.clientX - prevMouse.x;
+            const deltaY = e.clientY - prevMouse.y;
+            
+            // Adjust sensitivity
+            camAzimuth -= deltaX * 0.005;
+            camElevation += deltaY * 0.005;
+
+            // Clamp elevation to prevent flipping or going under board
+            const minEl = 0.1;
+            const maxEl = Math.PI / 2 - 0.1;
+            camElevation = Math.max(minEl, Math.min(maxEl, camElevation));
+
+            updateCamPos();
+        }
+        prevMouse = {x: e.clientX, y: e.clientY};
+    }
+
+    function onWheel(e) {
+        e.preventDefault();
+        camRadius += e.deltaY * 0.1;
+        camRadius = Math.max(50, Math.min(300, camRadius));
+        updateCamPos();
+    }
+
+    function updateCamPos() {
+        const y = camRadius * Math.sin(camElevation);
+        const rXZ = camRadius * Math.cos(camElevation); // radius on XZ plane
+        const x = rXZ * Math.sin(camAzimuth);
+        const z = rXZ * Math.cos(camAzimuth);
+
+        camera.position.set(x, y, z);
+        camera.lookAt(0,0,0);
+    }
+
+    function onMouseClick(e) {
+        if (game.game_over() || isM2M || isAnimating || document.getElementById('loading').style.display === 'block') return;
+        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(boardGroup.children);
+        
+        if (intersects.length > 0) {
+            const sq = intersects[0].object.userData.square;
+            if (selectedSquare) {
+                const moveConfig = { from: selectedSquare, to: sq, promotion: 'q' };
+                const tempMove = game.move(moveConfig);
+                if (tempMove) {
+                    drawHighlights(null); 
+                    game.undo(); 
+                    
+                    // --- KEY CHANGE: Hide old speech when player successfully moves ---
+                    document.getElementById('speech-bubble').classList.remove('visible');
+
+                    animatePiece(selectedSquare, sq, () => {
+                        game.move(moveConfig);
+                        selectedSquare = null;
+                        updateBoardDisplay(); 
+                        setTimeout(() => {
+                            // Player moved. Wait for AI logic. No speak here.
+                            setTimeout(makeAIMove, 500);
+                        }, 100);
+                    });
+                } else {
+                    selectSquare(sq);
+                }
+            } else {
+                selectSquare(sq);
+            }
+        }
+    }
+    function selectSquare(sq) {
+        const piece = game.get(sq);
+        if (piece && piece.color === game.turn()) {
+            selectedSquare = sq;
+            const moves = game.moves({ square: sq, verbose: true });
+            drawHighlights(sq, moves);
+        } else {
+            selectedSquare = null;
+            drawHighlights(null);
+        }
+    }
+    function makeAIMove() {
+        if (game.game_over()) { isM2M=false; updateStatus(); return; }
+        document.getElementById('status').innerText = "AI Thinking...";
+        setTimeout(() => {
+            const move = getBestMove(game);
+            if (move) { 
+                animatePiece(move.from, move.to, () => {
+                    game.move(move);
+                    updateBoardDisplay();
+                    
+                    analyzeAndSpeak(); // SPEAK HERE: Summarizing both moves
+
+                    if (isM2M && !game.game_over()) setTimeout(makeAIMove, 2000);
+                    updateStatus();
+                });
+            }
+        }, 50);
+    }
+
+    function startH2M() { resetGame(); isM2M=false; updateStatus("Your Turn"); }
+    function startM2M() { resetGame(); isM2M=true; updateStatus("Auto Mode"); setTimeout(makeAIMove, 500); }
+    
+    function undoMove() {
+        if (isM2M || isAnimating) return;
+        
+        // Undo AI move
+        const aiMove = game.undo();
+        if (aiMove) {
+            // Undo Player move
+            const playerMove = game.undo();
+            if (playerMove) {
+                // Success
+                updateBoardDisplay();
+                updateStatus("Undo Successful");
+                analyzeAndSpeak(); // Update commentary
+            } else {
+                // If only AI moved (shouldn't happen in H2M usually) or just started
+                game.move(aiMove); // Re-do AI move because player hadn't moved
+            }
+        }
+    }
+
+    function resetGame() {
+        game.reset(); selectedSquare = null; clearTimeout(aiTimeout);
+        drawHighlights(null); updateBoardDisplay();
+        camAzimuth = 0; 
+        camElevation = Math.PI / 4;
+        updateCamPos();
+        document.getElementById('speech-bubble').classList.remove('visible'); // Clear bubble on reset
+        analyzeAndSpeak(true);
+    }
+    function updateStatus(msg) {
+        const el = document.getElementById('status');
+        if (msg) el.innerText = msg;
+        else {
+            const c = game.turn() === 'w' ? 'White' : 'Black';
+            if (game.in_checkmate()) el.innerText = `Checkmate - ${c==='White'?'Black':'White'} Wins`;
+            else if (game.in_draw()) el.innerText = 'Draw';
+            else el.innerText = `${c} to Move`;
+        }
+    }
+
+    function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        if (isM2M) { camAzimuth += 0.001; updateCamPos(); }
+
+        if (particleSystem) particleSystem.rotation.y += 0.0005;
+        if (environmentGroup) environmentGroup.rotation.y += 0.001;
+
+        // Floating avatar animation
+        if (avatarSprite) {
+            avatarSprite.position.y = 22 + Math.sin(Date.now() * 0.002) * 2;
+            updateSpeechBubble(); // UPDATE BUBBLE POS
+        }
+
+        // Animate Coordinates
+        if (coordGroup) {
+            const time = Date.now() * 0.002;
+            coordGroup.children.forEach(child => {
+                // Bobbing
+                child.position.y = child.userData.originalY + Math.sin(time + child.userData.offset) * 0.5;
+                // Breathing (Opacity/Scale)
+                const breath = 0.8 + Math.sin(time * 0.5 + child.userData.offset) * 0.2;
+                child.material.opacity = breath;
+            });
+        }
+
+        if (activeTween) {
+            const now = Date.now();
+            const elapsed = now - activeTween.startTime;
+            let progress = elapsed / activeTween.duration;
+            if (progress >= 1) {
+                progress = 1;
+                activeTween.mesh.position.copy(activeTween.end);
+                const cb = activeTween.onComplete; activeTween = null; cb();
+            } else {
+                const ease = 1 - (1 - progress) * (1 - progress);
+                activeTween.mesh.position.lerpVectors(activeTween.start, activeTween.end, ease);
+                activeTween.mesh.position.y = Math.sin(progress * Math.PI) * 6; 
+            }
+        }
+        renderer.render(scene, camera);
+    }
+
+    init();
+
+</script>
+</body>
+</html>
